@@ -240,6 +240,7 @@ function MovimentoModal({ onClose, initialProductId }: { onClose: () => void; in
     <Modal
       open
       onClose={onClose}
+      onSubmit={salvar}
       title="Movimentar estoque"
       footer={
         <>

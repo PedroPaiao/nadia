@@ -105,6 +105,7 @@ function CriarFuncionarioModal({ onClose }: { onClose: () => void }) {
     <Modal
       open
       onClose={onClose}
+      onSubmit={salvar}
       title="Novo funcionário"
       footer={
         <>
@@ -161,6 +162,7 @@ function ResetSenhaModal({ funcionario, onClose }: { funcionario: Profile; onClo
     <Modal
       open
       onClose={onClose}
+      onSubmit={salvar}
       title={`Redefinir senha — ${funcionario.nome}`}
       footer={
         <>
@@ -200,6 +202,7 @@ function EditarFuncionarioModal({ funcionario, onClose }: { funcionario: Profile
     <Modal
       open
       onClose={onClose}
+      onSubmit={salvar}
       title={`Editar — ${funcionario.nome}`}
       footer={
         <>

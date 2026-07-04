@@ -7,7 +7,7 @@ import { Button, Field, Input, Textarea, Modal, MoneyInput, NumberInput } from '
 import { Combobox } from '@/components/Combobox'
 import { DatePicker, TimePicker } from '@/components/DateTimePicker'
 import { useToast } from '@/components/toast'
-import { formatBRL, hojeMaisDias, cn } from '@/lib/utils'
+import { formatBRL, hojeMaisDias, maskTelefone, cn } from '@/lib/utils'
 
 export function EncomendaForm({ encomenda, onClose }: { encomenda?: OrderComItens | null; onClose: () => void }) {
   const editing = !!encomenda
@@ -110,7 +110,13 @@ export function EncomendaForm({ encomenda, onClose }: { encomenda?: OrderComIten
             <Input value={cliente} onChange={(e) => setCliente(e.target.value)} maxLength={120} autoFocus />
           </Field>
           <Field label="WhatsApp / contato" hint="opcional">
-            <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000" maxLength={30} />
+            <Input
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(maskTelefone(e.target.value))}
+              placeholder="(00) 00000-0000"
+              inputMode="tel"
+              maxLength={16}
+            />
           </Field>
         </div>
 
@@ -173,6 +179,7 @@ export function EncomendaForm({ encomenda, onClose }: { encomenda?: OrderComIten
                     <div className="w-16">
                       <NumberInput
                         value={it.quantidade}
+                        decimais={produtos?.find((p) => p.id === it.product_id)?.unidade === 'kg' ? 3 : 0}
                         onChange={(n) => setItens((prev) => prev.map((x, i) => (i === idx ? { ...x, quantidade: n } : x)))}
                       />
                     </div>

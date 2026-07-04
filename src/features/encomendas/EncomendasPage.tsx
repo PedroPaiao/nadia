@@ -9,7 +9,8 @@ import {
 import { EncomendaForm } from './EncomendaForm'
 import type { OrderStatus, OrderPaymentMethod } from '@/types/db'
 import { ORDER_STATUS_LABELS, ORDER_PAYMENT_LABELS } from '@/types/db'
-import { Button, Card, CenterSpinner, EmptyState, Field, Select, Input, Modal, Badge } from '@/components/ui'
+import { Button, Card, CenterSpinner, EmptyState, Field, Select, Modal, Badge } from '@/components/ui'
+import { DatePicker } from '@/components/DateTimePicker'
 import { useToast } from '@/components/toast'
 import { formatBRL, formatDataBR, hojeMaisDias, cn } from '@/lib/utils'
 
@@ -225,7 +226,7 @@ function EntregarModal({ encomenda, onClose }: { encomenda: OrderComItens; onClo
     >
       <Field label="Previsão de pagamento" hint="quando o cliente vai pagar (licitação: alguns dias depois)">
         <div className="flex gap-2">
-          <Input type="date" value={previsao} onChange={(e) => setPrevisao(e.target.value)} />
+          <DatePicker value={previsao} onChange={setPrevisao} className="flex-1" />
           <Button variant="outline" size="sm" onClick={() => setPrevisao(hojeMaisDias(20))} className="whitespace-nowrap">+20 dias</Button>
         </div>
       </Field>

@@ -86,7 +86,19 @@ export function PDVPage() {
       <div className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto…" className="pl-9" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && busca.trim() && filtrados.length > 0) {
+                addProduct(filtrados[0])
+                setBusca('')
+              }
+            }}
+            placeholder="Buscar produto…"
+            className="pl-9"
+            autoFocus
+          />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -148,11 +160,11 @@ export function PDVPage() {
                   <p className="text-xs text-slate-500">{formatBRL(i.product.preco_venda)} un</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setQty(i.product.id, i.quantidade - 1)} className="rounded-lg bg-slate-100 p-1.5 text-slate-600 hover:bg-slate-200">
+                  <button onClick={() => setQty(i.product.id, i.quantidade - 1)} className="rounded-lg bg-slate-100 p-2.5 text-slate-600 hover:bg-slate-200">
                     <Minus className="h-3.5 w-3.5" />
                   </button>
                   <span className="w-8 text-center text-sm font-semibold tabular">{formatQty(i.quantidade)}</span>
-                  <button onClick={() => setQty(i.product.id, i.quantidade + 1)} className="rounded-lg bg-slate-100 p-1.5 text-slate-600 hover:bg-slate-200">
+                  <button onClick={() => setQty(i.product.id, i.quantidade + 1)} className="rounded-lg bg-slate-100 p-2.5 text-slate-600 hover:bg-slate-200">
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>

@@ -86,6 +86,16 @@ export function fimDoDiaExclusivoISO(yyyymmdd: string): string {
   return d.toISOString()
 }
 
+/** Máscara de telefone pt-BR: (00) 00000-0000 (aceita fixo e celular). */
+export function maskTelefone(input: string): string {
+  const d = (input || '').replace(/\D/g, '').slice(0, 11)
+  if (d.length === 0) return ''
+  if (d.length <= 2) return `(${d}`
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+}
+
 /** Formata uma data 'yyyy-mm-dd' (ou ISO) como dd/mm/aaaa, sem deslocamento de fuso. */
 export function formatDataBR(d: string | null | undefined): string {
   if (!d) return '—'

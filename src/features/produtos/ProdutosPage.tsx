@@ -11,6 +11,7 @@ import { CategoriasModal } from './CategoriasModal'
 import type { Product, ProductUnit } from '@/types/db'
 import { UNIT_LABELS } from '@/types/db'
 import { Button, Card, CenterSpinner, EmptyState, Input, Field, Select, Badge, Modal, MoneyInput, NumberInput } from '@/components/ui'
+import { Combobox } from '@/components/Combobox'
 import { useToast } from '@/components/toast'
 import { formatBRL, formatQty, unidadeLabel } from '@/lib/utils'
 
@@ -196,6 +197,7 @@ function ProdutoFormModal({ produto, onClose }: { produto: Product | null; onClo
     <Modal
       open
       onClose={onClose}
+      onSubmit={salvar}
       title={editing ? 'Editar produto' : 'Novo produto'}
       footer={
         <>
@@ -209,12 +211,12 @@ function ProdutoFormModal({ produto, onClose }: { produto: Product | null; onClo
           <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} autoFocus />
         </Field>
         <Field label="Categoria">
-          <Select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
-            <option value="">Sem categoria</option>
-            {categorias?.map((c) => (
-              <option key={c.id} value={c.id}>{c.nome}</option>
-            ))}
-          </Select>
+          <Combobox
+            items={[{ value: '', label: 'Sem categoria' }, ...(categorias ?? []).map((c) => ({ value: c.id, label: c.nome }))]}
+            value={categoriaId}
+            onSelect={(id) => setCategoriaId(id)}
+            placeholder="Buscar categoria…"
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Preço de venda">

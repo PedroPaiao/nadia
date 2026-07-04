@@ -191,6 +191,7 @@ function MovimentoCaixaModal({
     <Modal
       open
       onClose={onClose}
+      onSubmit={() => { if (valor > 0) onConfirm(Number(valor) || 0, motivo.trim() || undefined) }}
       title={titulo}
       size="sm"
       footer={
@@ -237,6 +238,7 @@ function FecharCaixaModal({ sessionId, onClose }: { sessionId: string; onClose: 
     <Modal
       open
       onClose={onClose}
+      onSubmit={handleFechar}
       title="Fechar caixa"
       footer={
         <>

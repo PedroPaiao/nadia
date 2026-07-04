@@ -188,7 +188,7 @@ function ComandaModal({ comanda, onClose, onPaid }: { comanda: ComandaComItens; 
               <NumberInput value={qtdAdd} onChange={setQtdAdd} decimais={3} />
             </div>
             <div className="flex-1">
-              <Combobox items={itemOptions} onSelect={(id) => add(id)} clearOnSelect placeholder="Buscar item (qtd ao lado)…" />
+              <Combobox items={itemOptions} onSelect={(id) => add(id)} clearOnSelect autoFocus placeholder="Buscar item (qtd ao lado)…" />
             </div>
           </div>
 

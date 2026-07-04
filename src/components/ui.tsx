@@ -108,29 +108,17 @@ interface MoneyInputProps {
   disabled?: boolean
 }
 
+// Máscara clássica de caixa: o operador digita só números e o valor preenche da
+// DIREITA para a esquerda (centavos primeiro): 1 → 0,01 · 12 → 0,12 · 12550 → 125,50.
+// Também aceita colar/digitar "1.234,56" (os separadores são ignorados). Sem estado
+// interno: a exibição é derivada do `value` (em reais), então nunca dessincroniza.
 export function MoneyInput({ value, onChange, className, autoFocus, placeholder = '0,00', id, disabled }: MoneyInputProps) {
-  const [text, setText] = useState(() => (value ? formatDecimalBR(value) : ''))
-  const ultimoEmitido = useRef(value)
-
-  // Sincroniza quando o valor muda por fora (ex.: reset do formulário).
-  useEffect(() => {
-    if (value !== ultimoEmitido.current) {
-      setText(value ? formatDecimalBR(value) : '')
-      ultimoEmitido.current = value
-    }
-  }, [value])
+  const display = value ? formatDecimalBR(value) : ''
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value.replace(/[^\d.,]/g, '') // sem sinal negativo
-    setText(raw)
-    const n = parseNumber(raw)
-    ultimoEmitido.current = n
-    onChange(n)
-  }
-
-  function handleBlur() {
-    const n = parseNumber(text)
-    setText(n ? formatDecimalBR(n) : '')
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 13) // só dígitos, limita tamanho
+    const cents = digits ? parseInt(digits, 10) : 0
+    onChange(cents / 100)
   }
 
   return (
@@ -139,10 +127,10 @@ export function MoneyInput({ value, onChange, className, autoFocus, placeholder 
       <input
         id={id}
         type="text"
-        inputMode="decimal"
-        value={text}
+        inputMode="numeric"
+        value={display}
         onChange={handleChange}
-        onBlur={handleBlur}
+        onFocus={(e) => e.target.select()}
         autoFocus={autoFocus}
         placeholder={placeholder}
         disabled={disabled}
@@ -272,6 +260,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  onSubmit,
 }: {
   open: boolean
   onClose: () => void
@@ -279,6 +268,8 @@ export function Modal({
   children: ReactNode
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg'
+  /** Ação primária disparada ao apertar Enter num campo de texto (não em textarea). */
+  onSubmit?: () => void
 }) {
   if (!open) return null
   const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }
@@ -287,6 +278,12 @@ export function Modal({
       <div
         className={cn('w-full rounded-t-2xl bg-white shadow-xl sm:rounded-2xl', sizes[size])}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onSubmit && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault()
+            onSubmit()
+          }
+        }}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
