@@ -1,0 +1,31 @@
+# Aplica as migrations no Supabase de produção a cada push na main que altere
+# arquivos de banco. É a forma mais robusta de manter o banco em dia (separada
+# do build do frontend na Vercel).
+#
+# Configure os Secrets do repositório (GitHub → Settings → Secrets → Actions):
+#   SUPABASE_ACCESS_TOKEN  → https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   → ref do projeto (Project Settings → General)
+#   SUPABASE_DB_PASSWORD   → senha do banco do projeto
+name: Supabase migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch: {}
+
+jobs:
+  db-push:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} -p ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Push migrations
+        run: supabase db push -p ${{ secrets.SUPABASE_DB_PASSWORD }}

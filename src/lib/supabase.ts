@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { normalizeUsuario } from './utils'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+// Projeto Supabase de PRODUÇÃO — chaves PÚBLICAS (seguras: protegidas por RLS,
+// já vão para o bundle do site de qualquer forma). Os env vars têm prioridade,
+// então o dev local (.env.local apontando para o Supabase local) continua no localhost.
+const FALLBACK_URL = 'https://cuhfudynbdvmqcmdcxpc.supabase.co'
+const FALLBACK_KEY = 'sb_publishable_KGkx2CgkzxeTcL71FGSVyA_78DsbV_W'
 
-if (!url || !anonKey) {
-  throw new Error(
-    'Configuração ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.local',
-  )
-}
+const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || FALLBACK_URL
+const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || FALLBACK_KEY
 
 export const supabase = createClient(url, anonKey, {
   auth: {

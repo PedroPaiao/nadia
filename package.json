@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "db:start": "supabase start",

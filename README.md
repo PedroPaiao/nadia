@@ -80,25 +80,39 @@ qualquer funcionário (as vendas passam a contar para ele); para voltar à conta
 
 ## Deploy (grátis)
 
-**Banco — Supabase Cloud (free tier):**
-1. Crie um projeto em [supabase.com](https://supabase.com).
-2. Faça login e link do projeto:
+> O Vercel hospeda o **frontend** (site estático). O **banco** (migrations + conta da dona)
+> fica no **Supabase**. A conta da dona (`admin` / `Secret123!`) é criada automaticamente
+> por uma migration — não há passo de seed manual em produção. **Troque a senha após o
+> 1º acesso.**
+
+**1) Banco — Supabase Cloud (free tier):**
+1. Crie um projeto em [supabase.com](https://supabase.com) e guarde a **senha do banco**.
+2. Aplique as migrations (do seu PC, uma vez):
    ```bash
    npx supabase login
    npx supabase link --project-ref SEU_PROJECT_REF
-   npx supabase db push        # aplica as migrations no projeto da nuvem
+   npx supabase db push          # cria todo o schema + a conta da dona
    ```
-3. Rode o conteúdo de **`supabase/seed-producao.sql`** uma vez no SQL Editor: ele cria
-   **apenas a conta da dona** (`admin` / `Secret123!`), sem dados de exemplo. Depois entre,
-   troque a senha e cadastre produtos e funcionários pelo painel.
-4. Pegue **Project URL** e **anon key** em *Project Settings → API*.
+3. Pegue **Project URL** e **anon key** em *Project Settings → API*.
 
-**Frontend — Vercel (ou Netlify/Cloudflare Pages):**
-1. Suba este repositório no GitHub e importe na Vercel.
-2. Configure as variáveis de ambiente:
+**2) Frontend — Vercel:**
+1. Importe o repositório do GitHub. Preset **Vite**, Output `dist` (padrão).
+2. Em *Settings → Environment Variables*, adicione:
    - `VITE_SUPABASE_URL` = Project URL do Supabase
    - `VITE_SUPABASE_ANON_KEY` = anon key do Supabase
-3. Build command: `npm run build` — Output: `dist`.
+3. Deploy. (O build já roda `tsc` + `vite build`.)
+
+**3) (Opcional) Migrations automáticas na pipeline**
+
+Escolha UMA das formas de aplicar migrations a cada deploy:
+
+- **No build do Vercel** — adicione também estas variáveis no Vercel e o build
+  (`vercel-build` → `scripts/vercel-build.mjs`) roda `supabase db push` antes de buildar:
+  - `SUPABASE_PROJECT_REF`, `SUPABASE_ACCESS_TOKEN` ([token](https://supabase.com/dashboard/account/tokens)), `SUPABASE_DB_PASSWORD`.
+  - Se essas 3 não estiverem definidas, o build só publica o frontend (seguro para previews).
+- **GitHub Actions** (mais robusto, recomendado) — `.github/workflows/supabase-migrations.yml`
+  aplica as migrations quando você faz push em `main`. Configure os mesmos 3 valores em
+  *GitHub → Settings → Secrets → Actions*.
 
 ## Segurança e integridade
 

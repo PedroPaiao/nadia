@@ -1,13 +1,12 @@
 -- =============================================================
--- Dados iniciais (rodados no `supabase db reset`)
--- Usuários de teste:
---   admin / Secret123!   (dona / administradora — senha forte)
---   maria / 123456       (funcionária — senha rápida de balcão)
--- Convenção: funcionários usam a senha rápida 123456 (troca rápida no balcão);
--- a conta da dona usa uma senha forte.
+-- Dados de EXEMPLO para desenvolvimento (rodados só no `supabase db reset`).
+-- A conta da dona (admin / Secret123!) é criada pela MIGRATION admin_bootstrap,
+-- então aqui criamos apenas os funcionários de teste e os produtos/encomendas demo.
+-- Este arquivo NÃO roda em produção (lá roda só `db push` = migrations).
+--
+-- Usuários de teste:  maria / 123456  e  joao / 123456  (senha rápida de balcão)
 -- =============================================================
 
-select public.criar_usuario_interno('admin', 'Secret123!', 'Administradora', 'admin');
 select public.criar_usuario_interno('maria', '123456', 'Maria (Balcão)', 'funcionario');
 select public.criar_usuario_interno('joao', '123456', 'João (Balcão)', 'funcionario');
 
