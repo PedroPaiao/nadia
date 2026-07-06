@@ -61,7 +61,7 @@ export function Layout() {
   return (
     <div className="flex min-h-screen bg-slate-100">
       {/* Sidebar (desktop) */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
             <ChefHat className="h-5 w-5" />
@@ -72,7 +72,7 @@ export function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           {items.map((item) => (
             <SideLink key={item.to} item={item} />
           ))}

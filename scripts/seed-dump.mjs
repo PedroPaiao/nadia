@@ -56,11 +56,12 @@ async function main() {
   console.log('Linhas:', JSON.stringify(counts))
   console.log(`admin (origem) = ${sourceAdminId} -> ${ADMIN_TOKEN}`)
 
-  // pg_dump só dos dados, como INSERTs (portável e fácil de tokenizar).
+  // pg_dump só dos dados, em formato COPY (blocos por tabela) — MUITO mais rápido
+  // que INSERT por linha ao carregar pela rede (1 stream por tabela vs. 8k+ round-trips).
+  // A tokenização por string ainda funciona: os uuids aparecem nas linhas do COPY.
   const args = [
     SOURCE,
     '--data-only',
-    '--column-inserts',
     '--no-owner',
     '--no-privileges',
     '--no-comments',

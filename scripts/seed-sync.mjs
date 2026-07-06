@@ -63,19 +63,17 @@ async function main() {
     process.exit(1)
   }
 
-  if (populated && FORCE) {
-    console.log('FORCE: limpando tabelas do backfill…', JSON.stringify(before))
-    try {
-      await client.query(`truncate ${TABLES.map((t) => `public.${t}`).join(', ')} restart identity cascade`)
-    } catch (e) {
-      await client.end()
-      throw new Error(`Não consegui limpar (permissão?). ${e.message}`)
-    }
-  }
   await client.end()
 
-  // Remapeia o token para a dona do destino e carrega numa única transação.
-  const substituted = sql.split(ADMIN_TOKEN).join(targetAdminId)
+  // ATÔMICO: o TRUNCATE vai DENTRO do mesmo --single-transaction do load. Se o load
+  // cair no meio (rede etc.), o truncate também é revertido — a produção NUNCA fica
+  // vazia. (Antes o truncate rodava numa transação própria que commitava sozinha.)
+  const truncatePrefix = FORCE && populated
+    ? `truncate ${TABLES.map((t) => `public.${t}`).join(', ')} restart identity cascade;\n`
+    : ''
+  if (FORCE && populated) console.log('FORCE: vai limpar e recarregar numa transação só…', JSON.stringify(before))
+
+  const substituted = truncatePrefix + sql.split(ADMIN_TOKEN).join(targetAdminId)
   const dir = mkdtempSync(join(tmpdir(), 'seedsync-'))
   const tmpFile = join(dir, 'backfill.sql')
   writeFileSync(tmpFile, substituted, 'utf8')
