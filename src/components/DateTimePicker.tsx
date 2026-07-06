@@ -1,24 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn, formatDataBR, hojeData, toISODate } from '@/lib/utils'
+import { useAnchoredStyle, useDismiss } from './usePopover'
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ]
-
-function useClickOutside(onOutside: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [onOutside])
-  return ref
-}
 
 // ---------------- DatePicker ----------------
 export function DatePicker({
@@ -35,13 +25,15 @@ export function DatePicker({
   clearable?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useClickOutside(() => setOpen(false))
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+  useDismiss(open, () => setOpen(false), [anchorRef, popRef])
+  const popStyle = useAnchoredStyle(open, anchorRef, { height: 380, width: 288 })
 
   const selected = value ? new Date(`${value}T00:00:00`) : null
   const base = selected ?? new Date(`${hojeData()}T00:00:00`)
   const [view, setView] = useState(() => new Date(base.getFullYear(), base.getMonth(), 1))
 
-  // Ressincroniza o mês exibido ao abrir ou quando o valor muda por fora.
   useEffect(() => {
     if (!open) return
     const b = value ? new Date(`${value}T00:00:00`) : new Date(`${hojeData()}T00:00:00`)
@@ -64,7 +56,7 @@ export function DatePicker({
   }
 
   return (
-    <div ref={ref} className={cn('relative', className)}>
+    <div ref={anchorRef} className={cn('relative', className)}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -82,8 +74,8 @@ export function DatePicker({
         )}
       </button>
 
-      {open && (
-        <div className="absolute z-40 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+      {open && createPortal(
+        <div ref={popRef} style={popStyle} className="overflow-auto rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between">
             <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
               <ChevronLeft className="h-4 w-4" />
@@ -128,7 +120,8 @@ export function DatePicker({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -159,25 +152,27 @@ export function TimePicker({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState(value)
-  const ref = useClickOutside(() => { setOpen(false); setQuery(value) })
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+  useDismiss(open, () => { setOpen(false); setQuery(value) }, [anchorRef, popRef])
+  const popStyle = useAnchoredStyle(open, anchorRef, { height: 220, matchWidth: true })
 
   useEffect(() => { setQuery(value) }, [value])
 
   function handleInput(v: string) {
-    // permite dígitos e ":" e formata HH:MM
     let s = v.replace(/[^\d:]/g, '')
     if (s.length === 2 && !s.includes(':') && query.length < s.length) s = s + ':'
     if (s.length > 5) s = s.slice(0, 5)
     setQuery(s)
     setOpen(true)
-    const m = /^(\d{2}):(\d{2})$/.exec(s)
-    if (m && Number(m[1]) <= 23 && Number(m[2]) <= 59) onChange(s)
+    const mm = /^(\d{2}):(\d{2})$/.exec(s)
+    if (mm && Number(mm[1]) <= 23 && Number(mm[2]) <= 59) onChange(s)
   }
 
   const filtrados = query ? HORARIOS.filter((h) => h.startsWith(query.replace(/[^\d:]/g, ''))) : HORARIOS
 
   return (
-    <div ref={ref} className={cn('relative', className)}>
+    <div ref={anchorRef} className={cn('relative', className)}>
       <div className="relative">
         <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -194,8 +189,8 @@ export function TimePicker({
           </button>
         )}
       </div>
-      {open && filtrados.length > 0 && (
-        <div className="absolute z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+      {open && filtrados.length > 0 && createPortal(
+        <div ref={popRef} style={popStyle} className="overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           {filtrados.map((h) => (
             <button
               key={h}
@@ -206,7 +201,8 @@ export function TimePicker({
               {h}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

@@ -10,6 +10,7 @@ import { EstoquePage } from '@/features/estoque/EstoquePage'
 import { ProdutosPage } from '@/features/produtos/ProdutosPage'
 import { FuncionariosPage } from '@/features/funcionarios/FuncionariosPage'
 import { RelatoriosPage } from '@/features/relatorios/RelatoriosPage'
+import { FinanceiroPage } from '@/features/financeiro/FinanceiroPage'
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
           <Route path="estoque" element={<EstoquePage />} />
 
           <Route element={<RequireAdmin />}>
+            <Route path="financeiro" element={<FinanceiroPage />} />
             <Route path="produtos" element={<ProdutosPage />} />
             <Route path="funcionarios" element={<FuncionariosPage />} />
             <Route path="relatorios" element={<RelatoriosPage />} />

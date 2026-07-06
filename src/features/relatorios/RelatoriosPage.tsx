@@ -1,23 +1,26 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart3, ShieldCheck, TrendingUp, TrendingDown, Download, DollarSign, ArrowRight } from 'lucide-react'
+import { BarChart3, ShieldCheck, TrendingUp, TrendingDown, Download, DollarSign, ArrowRight, Receipt, ChevronDown, Trash2 } from 'lucide-react'
 import {
-  useResumoVendas, useProdutosVendidos, usePorFuncionario, useTotais, useVendasPorDia,
+  useResumoVendas, useProdutosVendidos, usePorFuncionario, useTotais, useVendasPorDia, useVendasDetalhe,
+  useExcluirVenda, buscarVendasParaExport,
 } from './api'
 import { useContasReceber } from '@/features/encomendas/api'
 import { AuditoriaCaixa } from './AuditoriaCaixa'
 import { PAYMENT_LABELS } from '@/types/db'
 import { Card, CardHeader, CenterSpinner, EmptyState, Field, Button } from '@/components/ui'
 import { DatePicker } from '@/components/DateTimePicker'
+import { useAuth } from '@/auth/AuthProvider'
+import { useToast } from '@/components/toast'
 import {
-  formatBRL, formatQty, formatDecimalBR, formatDataBR, hojeData, hojeMaisDias,
+  formatBRL, formatQty, formatDecimalBR, formatDataBR, formatDataHora, hojeData, hojeMaisDias,
   primeiroDiaDoMes, ultimoDiaDoMes, inicioDoDiaISO, fimDoDiaExclusivoISO, cn,
 } from '@/lib/utils'
 
-type Aba = 'vendas' | 'caixa'
+type Aba = 'resumo' | 'vendas' | 'caixa'
 
 export function RelatoriosPage() {
-  const [aba, setAba] = useState<Aba>('vendas')
+  const [aba, setAba] = useState<Aba>('resumo')
   const [de, setDe] = useState(hojeData())
   const [ate, setAte] = useState(hojeData())
 
@@ -38,9 +41,10 @@ export function RelatoriosPage() {
     <div className="mx-auto max-w-5xl space-y-4">
       <h1 className="text-2xl font-bold text-slate-900">Relatórios</h1>
 
-      <div className="flex gap-2">
-        <TabButton active={aba === 'vendas'} onClick={() => setAba('vendas')} icon={<BarChart3 className="h-4 w-4" />}>Vendas</TabButton>
-        <TabButton active={aba === 'caixa'} onClick={() => setAba('caixa')} icon={<ShieldCheck className="h-4 w-4" />}>Auditoria de Caixa</TabButton>
+      <div className="flex flex-wrap gap-2">
+        <TabButton active={aba === 'resumo'} onClick={() => setAba('resumo')} icon={<BarChart3 className="h-4 w-4" />}>Resumo</TabButton>
+        <TabButton active={aba === 'vendas'} onClick={() => setAba('vendas')} icon={<Receipt className="h-4 w-4" />}>Venda a venda</TabButton>
+        <TabButton active={aba === 'caixa'} onClick={() => setAba('caixa')} icon={<ShieldCheck className="h-4 w-4" />}>Caixa</TabButton>
       </div>
 
       <Card className="p-3">
@@ -57,7 +61,9 @@ export function RelatoriosPage() {
         </div>
       </Card>
 
-      {aba === 'vendas' ? <RelatorioVendas inicio={inicio} fim={fim} periodo={`${formatDataBR(d1)} a ${formatDataBR(d2)}`} /> : <AuditoriaCaixa inicio={inicio} fim={fim} />}
+      {aba === 'resumo' && <RelatorioVendas inicio={inicio} fim={fim} periodo={`${formatDataBR(d1)} a ${formatDataBR(d2)}`} />}
+      {aba === 'vendas' && <RelatorioDetalhe key={inicio + fim} inicio={inicio} fim={fim} periodo={`${formatDataBR(d1)} a ${formatDataBR(d2)}`} />}
+      {aba === 'caixa' && <AuditoriaCaixa inicio={inicio} fim={fim} />}
     </div>
   )
 }
@@ -69,6 +75,11 @@ function RelatorioVendas({ inicio, fim, periodo }: { inicio: string; fim: string
   const { data: produtos } = useProdutosVendidos(inicio, fim)
   const { data: porDia } = useVendasPorDia(inicio, fim)
   const { data: contas } = useContasReceber()
+  const [ordProd, setOrdProd] = useState<'total' | 'quantidade'>('total')
+
+  const produtosOrd = [...(produtos ?? [])].sort((a, b) =>
+    ordProd === 'total' ? b.total - a.total : b.quantidade - a.quantidade,
+  )
 
   // Período anterior de mesma duração, para comparativo.
   const durMs = new Date(fim).getTime() - new Date(inicio).getTime()
@@ -206,8 +217,27 @@ function RelatorioVendas({ inicio, fim, periodo }: { inicio: string; fim: string
 
       {/* Produtos mais vendidos com lucro */}
       <Card>
-        <CardHeader title="Produtos mais vendidos" subtitle="lucro estimado (itens sem custo cadastrado contam como custo zero)" />
-        {!produtos || produtos.length === 0 ? (
+        <CardHeader
+          title="Produtos mais vendidos"
+          subtitle="lucro estimado (itens sem custo contam como custo zero)"
+          action={
+            <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+              <button
+                onClick={() => setOrdProd('total')}
+                className={cn('rounded-md px-2.5 py-1', ordProd === 'total' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500')}
+              >
+                Faturamento
+              </button>
+              <button
+                onClick={() => setOrdProd('quantidade')}
+                className={cn('rounded-md px-2.5 py-1', ordProd === 'quantidade' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500')}
+              >
+                Quantidade
+              </button>
+            </div>
+          }
+        />
+        {produtosOrd.length === 0 ? (
           <EmptyState title="Sem dados" />
         ) : (
           <div className="overflow-x-auto">
@@ -221,7 +251,7 @@ function RelatorioVendas({ inicio, fim, periodo }: { inicio: string; fim: string
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {produtos.map((p) => (
+                {produtosOrd.map((p) => (
                   <tr key={p.product_id ?? p.product_nome}>
                     <td className="px-5 py-2.5 font-medium text-slate-800">{p.product_nome}</td>
                     <td className="px-2 py-2.5 text-right text-slate-500">{formatQty(p.quantidade)}</td>
@@ -234,6 +264,129 @@ function RelatorioVendas({ inicio, fim, periodo }: { inicio: string; fim: string
           </div>
         )}
       </Card>
+    </div>
+  )
+}
+
+function RelatorioDetalhe({ inicio, fim, periodo }: { inicio: string; fim: string; periodo: string }) {
+  const { isAdmin } = useAuth()
+  const toast = useToast()
+  const excluir = useExcluirVenda()
+  const [limite, setLimite] = useState(30)
+  const [aberta, setAberta] = useState<string | null>(null)
+  const [exportando, setExportando] = useState(false)
+  const { data, isLoading } = useVendasDetalhe(inicio, fim, limite)
+
+  const vendas = data?.rows ?? []
+  const total = data?.total ?? 0
+
+  async function apagarVenda(id: string) {
+    if (!confirm('Excluir esta venda? O estoque será devolvido. Não dá para desfazer.')) return
+    try { await excluir.mutateAsync(id); toast.success('Venda excluída.') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Erro.') }
+  }
+
+  // Exporta TODAS as vendas do período (não só a página carregada).
+  async function exportarCSV() {
+    setExportando(true)
+    try {
+      const todas = await buscarVendasParaExport(inicio, fim)
+      const linhas: (string | number)[][] = [
+        ['Data/hora', 'Cliente', 'Pagamento', 'Operador', 'Total', 'Itens'],
+        ...todas.map((v) => [
+          formatDataHora(v.created_at),
+          v.cliente_nome ?? '',
+          PAYMENT_LABELS[v.forma_pagamento],
+          v.funcionario?.nome ?? '',
+          formatDecimalBR(v.total),
+          v.sale_items.map((i) => `${formatQty(i.quantidade)}x ${i.product_nome}`).join(' | '),
+        ]),
+      ]
+      const csv = '﻿' + linhas.map((l) => l.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `vendas-${inicio.slice(0, 10)}_a_${fim.slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao exportar.')
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  if (isLoading) return <CenterSpinner />
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-700">{total}</span> venda(s) · {periodo}
+        </p>
+        {total > 0 && (
+          <Button variant="outline" size="sm" onClick={exportarCSV} loading={exportando}><Download className="h-4 w-4" /> Exportar CSV</Button>
+        )}
+      </div>
+
+      {vendas.length === 0 ? (
+        <Card><EmptyState title="Nenhuma venda no período" /></Card>
+      ) : (
+        <Card className="divide-y divide-slate-100 overflow-hidden">
+          {vendas.map((v) => (
+            <div key={v.id}>
+              <button onClick={() => setAberta((a) => (a === v.id ? null : v.id))} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-800">
+                    {formatDataHora(v.created_at)}{v.cliente_nome ? ` • ${v.cliente_nome}` : ''}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">
+                    {PAYMENT_LABELS[v.forma_pagamento]} · {v.funcionario?.nome ?? '—'} · {v.sale_items.length} item(s)
+                  </p>
+                </div>
+                <span className="shrink-0 font-bold tabular text-slate-900">{formatBRL(v.total)}</span>
+                <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition', aberta === v.id && 'rotate-180')} />
+              </button>
+              {aberta === v.id && (
+                <div className="bg-slate-50 px-4 py-2 text-sm">
+                  {v.sale_items.map((it, i) => (
+                    <div key={i} className="flex justify-between py-0.5 text-slate-600">
+                      <span className="truncate">{formatQty(it.quantidade)}× {it.product_nome}</span>
+                      <span className="tabular">{formatBRL(it.subtotal)}</span>
+                    </div>
+                  ))}
+                  {v.desconto > 0 && (
+                    <div className="flex justify-between py-0.5 font-medium text-red-500">
+                      <span>Desconto</span><span className="tabular">- {formatBRL(v.desconto)}</span>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="mt-2 flex justify-end border-t border-slate-200 pt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={() => apagarVenda(v.id)}
+                        disabled={excluir.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" /> Excluir venda
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {vendas.length < total && (
+            <div className="flex justify-center py-3">
+              <Button variant="outline" size="sm" onClick={() => setLimite((l) => l + 30)}>
+                Carregar mais ({total - vendas.length} restantes)
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   )
 }

@@ -67,6 +67,52 @@ qualquer funcionário (as vendas passam a contar para ele); para voltar à conta
 | `npm run db:stop`  | Para o Supabase local                            |
 | `npm run db:reset` | Recria o banco: migrations + seed                |
 | `npm run db:status`| Mostra URLs e chaves do Supabase local           |
+| `npm test`         | Testes das regras de negócio (modo watch)        |
+| `npm run test:run` | Roda todos os testes uma vez (CI)                |
+| `npm run seed:dump`| Snapshot dos dados históricos → `supabase/seeds/backfill.sql` |
+| `npm run seed:sync`| Carrega esse snapshot num banco (local ou produção) |
+
+## Testes automatizados
+
+As regras de negócio críticas têm testes (Vitest) que rodam contra o Postgres do
+Supabase local. Cada teste roda numa **transação revertida** (rollback) e impersona
+papéis (`admin`/`funcionário`/`anon`) igual ao PostgREST faz — então exercitam RLS,
+`is_admin()`, triggers _append-only_ e as RPCs de verdade, sem sujar o banco.
+
+```bash
+npm run db:start   # o Postgres local precisa estar no ar
+npm run test:run
+```
+
+Cobrem: venda (preço recalculado no servidor, baixa de estoque, exige caixa aberto,
+troco/desconto), caixa (um só aberto, esperado calculado, `caixa_resumo` só admin),
+comandas (baixa ao adicionar, estorno, fechar vira venda sem baixar de novo, trava de
+dupla-venda), exclusões só-admin + travas append-only, encomendas + contas a receber,
+financeiro (RLS admin, `pagar_despesa` abate saldo) e os utilitários de UI (máscara de
+dinheiro, `normalizeUsuario`, datas).
+
+## Sincronizar a seed do backfill
+
+Os dados históricos importados do Firebase (produtos, vendas, encomendas) viram um
+snapshot versionável. Fluxo:
+
+```bash
+# 1. Capturar o estado atual do banco de origem (padrão: local) num arquivo commitável
+npm run seed:dump
+
+# 2a. Repovoar o local depois de um reset
+npm run db:reset && npm run seed:sync
+
+# 2b. Levar o histórico para a PRODUÇÃO (a 1ª vez)
+DATABASE_URL="postgresql://postgres:SENHA@db.<ref>.supabase.co:5432/postgres" npm run seed:sync
+
+# Recarregar por cima (limpa as tabelas do backfill antes):
+FORCE=1 npm run seed:sync
+```
+
+O `seed:sync` **remapeia** automaticamente as vendas para a conta da dona do banco de
+destino (o `id` do admin muda por ambiente) e, por segurança, **aborta se o destino já
+tiver dados** — use `FORCE=1` para limpar e recarregar.
 
 ## Fluxo de uso
 

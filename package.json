@@ -9,10 +9,14 @@
     "vercel-build": "node scripts/vercel-build.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:status": "supabase status"
+    "db:status": "supabase status",
+    "seed:dump": "node scripts/seed-dump.mjs",
+    "seed:sync": "node scripts/seed-sync.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -20,6 +24,7 @@
     "@tanstack/react-query": "^5.56.2",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "firebase-admin": "^14.1.0",
     "lucide-react": "^0.441.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -30,14 +35,17 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
+    "pg": "^8.22.0",
     "postcss": "^8.4.47",
     "supabase": "^1.200.3",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2",
-    "vite": "^5.4.7"
+    "vite": "^5.4.7",
+    "vitest": "^2.1.9"
   }
 }

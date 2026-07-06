@@ -13,6 +13,14 @@ dist-ssr
 .env.*
 !.env.example
 
+# migração do firebase (NUNCA commitar credenciais nem dados exportados)
+serviceAccount.json
+firebase-export/
+
+# snapshot do backfill = dados reais do negócio; NÃO commitar (repo é público).
+# Vai direto pro banco via `npm run seed:sync`.
+supabase/seeds/
+
 # supabase
 supabase/.branches
 supabase/.temp

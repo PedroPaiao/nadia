@@ -197,6 +197,46 @@ export interface ComandaItem {
   created_at: string
 }
 
+// ---------------- Financeiro ----------------
+export type ExpenseCategory = 'fornecedor' | 'funcionario' | 'aluguel' | 'contas' | 'impostos' | 'boleto' | 'outro'
+export type ExpenseStatus = 'pendente' | 'pago'
+
+export interface Conta {
+  id: string
+  nome: string
+  saldo: number
+  ordem: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Despesa {
+  id: string
+  descricao: string
+  categoria: ExpenseCategory
+  beneficiario: string | null
+  valor: number
+  status: ExpenseStatus
+  data_vencimento: string | null
+  data_pagamento: string | null
+  forma_pagamento: OrderPaymentMethod | null
+  conta_id: string | null
+  observacao: string | null
+  funcionario_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  fornecedor: 'Fornecedor',
+  funcionario: 'Funcionário',
+  aluguel: 'Aluguel',
+  contas: 'Água / Luz / Gás',
+  impostos: 'Impostos / Taxas',
+  boleto: 'Boleto',
+  outro: 'Outro',
+}
+
 export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   dinheiro: 'Dinheiro',
   pix: 'Pix',

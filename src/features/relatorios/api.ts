@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, mensagemErro } from '@/lib/supabase'
 import type { CashSession, PaymentMethod, SaleStatus } from '@/types/db'
 
@@ -152,6 +152,73 @@ export function useVendasSessao(sessionId: string | undefined) {
         .order('created_at', { ascending: false })
       if (error) throw new Error(mensagemErro(error))
       return (data as unknown as VendaSessaoRow[]) ?? []
+    },
+  })
+}
+
+// ---------------- Relatório analítico: venda a venda ----------------
+export interface VendaDetalheRow {
+  id: string
+  created_at: string
+  forma_pagamento: PaymentMethod
+  total: number
+  desconto: number
+  cliente_nome: string | null
+  funcionario: { nome: string } | null
+  sale_items: { product_nome: string; quantidade: number; subtotal: number }[]
+}
+export interface VendasDetalhePagina {
+  rows: VendaDetalheRow[]
+  total: number
+}
+
+/** Busca TODAS as vendas do período (para exportar CSV completo, sem paginação). */
+export async function buscarVendasParaExport(inicio: string, fim: string): Promise<VendaDetalheRow[]> {
+  const { data, error } = await supabase
+    .from('sales')
+    .select('id, created_at, forma_pagamento, total, desconto, cliente_nome, funcionario:profiles(nome), sale_items(product_nome, quantidade, subtotal)')
+    .eq('status', 'concluida')
+    .gte('created_at', inicio)
+    .lt('created_at', fim)
+    .order('created_at', { ascending: false })
+    .limit(20000)
+  if (error) throw new Error(mensagemErro(error))
+  return (data as unknown as VendaDetalheRow[]) ?? []
+}
+
+export function useExcluirVenda() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('excluir_venda', { p_sale_id: id })
+      if (error) throw new Error(mensagemErro(error))
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['relatorios'] })
+      qc.invalidateQueries({ queryKey: ['caixa'] })
+      qc.invalidateQueries({ queryKey: ['produtos'] })
+      qc.invalidateQueries({ queryKey: ['estoque'] })
+    },
+  })
+}
+
+export function useVendasDetalhe(inicio: string, fim: string, limite = 30) {
+  return useQuery({
+    queryKey: ['relatorios', 'vendas-detalhe', inicio, fim, limite],
+    queryFn: async (): Promise<VendasDetalhePagina> => {
+      const { data, error, count } = await supabase
+        .from('sales')
+        .select(
+          'id, created_at, forma_pagamento, total, desconto, cliente_nome, funcionario:profiles(nome), sale_items(product_nome, quantidade, subtotal)',
+          { count: 'exact' },
+        )
+        .eq('status', 'concluida')
+        .gte('created_at', inicio)
+        .lt('created_at', fim)
+        .order('created_at', { ascending: false })
+        .limit(limite)
+      if (error) throw new Error(mensagemErro(error))
+      return { rows: (data as unknown as VendaDetalheRow[]) ?? [], total: count ?? 0 }
     },
   })
 }

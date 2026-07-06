@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   ShoppingCart,
   Utensils,
@@ -9,9 +9,11 @@ import {
   Tags,
   Users,
   BarChart3,
+  PiggyBank,
   LogOut,
   ChefHat,
   UserCog,
+  MoreHorizontal,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
@@ -32,6 +34,7 @@ const NAV: NavItem[] = [
   { to: '/app/encomendas', label: 'Encomendas', icon: ClipboardList },
   { to: '/app/caixa', label: 'Caixa', icon: Wallet },
   { to: '/app/estoque', label: 'Estoque', icon: Package },
+  { to: '/app/financeiro', label: 'Financeiro', icon: PiggyBank, adminOnly: true },
   { to: '/app/produtos', label: 'Produtos', icon: Tags, adminOnly: true },
   { to: '/app/funcionarios', label: 'Funcionários', icon: Users, adminOnly: true },
   { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3, adminOnly: true },
@@ -40,8 +43,15 @@ const NAV: NavItem[] = [
 export function Layout() {
   const { profile, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [trocar, setTrocar] = useState(false)
   const items = NAV.filter((n) => !n.adminOnly || isAdmin)
+  const [mais, setMais] = useState(false)
+
+  // No celular, mostra até 5 itens; se houver mais, os 4 primeiros + "Mais".
+  const MAX_BARRA = 5
+  const barra = items.length > MAX_BARRA ? items.slice(0, MAX_BARRA - 1) : items
+  const extras = items.length > MAX_BARRA ? items.slice(MAX_BARRA - 1) : []
 
   async function handleLogout() {
     await signOut()
@@ -114,10 +124,59 @@ export function Layout() {
 
       {/* Bottom nav (mobile) */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white md:hidden">
-        {items.map((item) => (
+        {barra.map((item) => (
           <BottomLink key={item.to} item={item} />
         ))}
+        {extras.length > 0 && (
+          <button
+            onClick={() => setMais(true)}
+            className={cn(
+              'flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium',
+              extras.some((e) => location.pathname.startsWith(e.to)) ? 'text-brand-600' : 'text-slate-500',
+            )}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            Mais
+          </button>
+        )}
       </nav>
+
+      {/* Sheet "Mais" (mobile) */}
+      {mais && (
+        <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setMais(false)}>
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 pb-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-200" />
+            <div className="grid grid-cols-3 gap-2">
+              {extras.map((item) => {
+                const Icon = item.icon
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMais(false)}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs font-medium',
+                        isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100',
+                      )
+                    }
+                  >
+                    <Icon className="h-6 w-6" />
+                    {item.label}
+                  </NavLink>
+                )
+              })}
+              <button
+                onClick={() => { setMais(false); handleLogout() }}
+                className="flex flex-col items-center gap-1.5 rounded-xl p-4 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                <LogOut className="h-6 w-6" />
+                Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {trocar && <TrocarUsuarioModal onClose={() => setTrocar(false)} />}
     </div>

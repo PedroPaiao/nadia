@@ -24,13 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     if (error) {
       console.error('Erro ao carregar perfil:', error)
+      // Sessão provavelmente expirada/inválida (ex.: token velho no localStorage).
+      // Limpa para o app cair no login em vez de ficar preso — nunca travar o balcão.
+      await supabase.auth.signOut().catch(() => {})
+      loadedFor.current = null
+      setSession(null)
       setProfile(null)
       return null
     }
     const prof = data as Profile | null
     if (prof && !prof.ativo) {
       // Usuário desativado: encerra a sessão.
-      await supabase.auth.signOut()
+      await supabase.auth.signOut().catch(() => {})
       setProfile(null)
       return null
     }
@@ -41,15 +46,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return
-      setSession(data.session)
-      if (data.session) {
-        loadedFor.current = data.session.user.id
-        await loadProfile(data.session.user.id)
+    // Rede de segurança: o app NUNCA pode ficar preso em "Carregando…". Se o
+    // getSession/refresh travar (token expirado, lock interno do supabase-js,
+    // rede lenta), libera a tela assim mesmo — o onAuthStateChange corrige depois.
+    const safety = setTimeout(() => {
+      if (mounted) setLoading(false)
+    }, 5000)
+
+    async function init() {
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (!mounted) return
+        setSession(data.session)
+        if (data.session) {
+          loadedFor.current = data.session.user.id
+          await loadProfile(data.session.user.id)
+        }
+      } catch (e) {
+        console.error('Erro ao inicializar a sessão:', e)
+        if (mounted) {
+          setSession(null)
+          setProfile(null)
+        }
+      } finally {
+        if (mounted) {
+          clearTimeout(safety)
+          setLoading(false)
+        }
       }
-      setLoading(false)
-    })
+    }
+    init()
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!mounted) return
@@ -63,10 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadedFor.current = null
         setProfile(null)
       }
+      // Garante que qualquer evento de auth também destrava a tela inicial.
+      setLoading(false)
     })
 
     return () => {
       mounted = false
+      clearTimeout(safety)
       sub.subscription.unsubscribe()
     }
   }, [])

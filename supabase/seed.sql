@@ -4,11 +4,10 @@
 -- então aqui criamos apenas os funcionários de teste e os produtos/encomendas demo.
 -- Este arquivo NÃO roda em produção (lá roda só `db push` = migrations).
 --
--- Usuários de teste:  maria / 123456  e  joao / 123456  (senha rápida de balcão)
+-- Usuário de teste:  funcionario / 123456  (senha rápida de balcão)
 -- =============================================================
 
-select public.criar_usuario_interno('maria', '123456', 'Maria (Balcão)', 'funcionario');
-select public.criar_usuario_interno('joao', '123456', 'João (Balcão)', 'funcionario');
+select public.criar_usuario_interno('funcionario', '123456', 'Funcionário', 'funcionario');
 
 insert into public.categories (nome, ordem) values
   ('Salgados Fritos', 1),
@@ -57,7 +56,7 @@ values
   ('Dona Cleuza (aniversário)', '100 coxinhas + 100 quibes para festa',
    'retirada', 0, 140.00, 'pendente',
    date '2026-07-10', null, null,
-   (select id from public.profiles where usuario = 'maria'), null),
+   (select id from public.profiles where usuario = 'funcionario'), null),
   -- Encomenda já paga (histórico)
   ('Buffet Estrela', 'Salgados para casamento',
    'entrega', 0, 650.00, 'pago',

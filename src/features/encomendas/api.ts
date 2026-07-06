@@ -39,25 +39,43 @@ export interface EncomendaInput {
 }
 
 export const encomendaKeys = {
-  lista: (status?: string) => ['encomendas', 'lista', status ?? 'todas'] as const,
+  lista: (status?: string, limite?: number) => ['encomendas', 'lista', status ?? 'todas', limite ?? 0] as const,
   contasReceber: ['encomendas', 'contas-receber'] as const,
 }
 
-export function useEncomendas(status?: OrderStatus | 'ativas') {
+export interface EncomendasPagina {
+  rows: OrderComItens[]
+  total: number
+}
+
+/** Lista paginada (traz `limite` encomendas + o total, para o "carregar mais"). */
+export function useEncomendas(status?: OrderStatus | 'ativas', limite = 30) {
   return useQuery({
-    queryKey: encomendaKeys.lista(status),
-    queryFn: async (): Promise<OrderComItens[]> => {
+    queryKey: encomendaKeys.lista(status, limite),
+    queryFn: async (): Promise<EncomendasPagina> => {
       let q = supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select('*, order_items(*)', { count: 'exact' })
         .order('data_agendada', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
+        .limit(limite)
       if (status === 'ativas') q = q.in('status', ['pendente', 'entregue'])
       else if (status) q = q.eq('status', status)
-      const { data, error } = await q
+      const { data, error, count } = await q
       if (error) throw new Error(mensagemErro(error))
-      return (data as unknown as OrderComItens[]) ?? []
+      return { rows: (data as unknown as OrderComItens[]) ?? [], total: count ?? 0 }
     },
+  })
+}
+
+export function useExcluirEncomenda() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('excluir_encomenda', { p_order_id: id })
+      if (error) throw new Error(mensagemErro(error))
+    },
+    onSuccess: () => invalidateAll(qc),
   })
 }
 

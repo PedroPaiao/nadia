@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Wallet, LockOpen, ArrowDownLeft, ArrowUpRight, DoorClosed, Banknote } from 'lucide-react'
+import { Wallet, LockOpen, ArrowDownLeft, ArrowUpRight, DoorClosed, Banknote, Trash2 } from 'lucide-react'
 import {
   useCaixaAberto,
   useCaixaResumo,
@@ -7,9 +7,11 @@ import {
   useAbrirCaixa,
   useFecharCaixa,
   useRegistrarMovimentoCaixa,
+  useExcluirMovimentoCaixa,
 } from './api'
 import type { CashMovementType } from '@/types/db'
 import { Button, Card, CardHeader, CenterSpinner, Input, Field, Textarea, Modal, Badge, MoneyInput } from '@/components/ui'
+import { useAuth } from '@/auth/AuthProvider'
 import { useToast } from '@/components/toast'
 import { formatBRL, cn } from '@/lib/utils'
 
@@ -61,11 +63,19 @@ function AbrirCaixa() {
 
 function CaixaAberto({ sessionId, caixa }: { sessionId: string; caixa: { valor_abertura: number; aberto_em: string; funcionario: { nome: string } | null } }) {
   const toast = useToast()
-  const { data: resumo } = useCaixaResumo(sessionId)
+  const { isAdmin } = useAuth()
+  const { data: resumo } = useCaixaResumo(sessionId, isAdmin)
   const { data: movimentos } = useMovimentosCaixa(sessionId)
   const movimentar = useRegistrarMovimentoCaixa()
+  const excluirMov = useExcluirMovimentoCaixa()
   const [movTipo, setMovTipo] = useState<CashMovementType | null>(null)
   const [fecharOpen, setFecharOpen] = useState(false)
+
+  async function apagarMov(id: string) {
+    if (!confirm('Excluir este movimento de caixa?')) return
+    try { await excluirMov.mutateAsync(id); toast.success('Movimento excluído.') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Erro.') }
+  }
 
   return (
     <div className="space-y-4">
@@ -86,14 +96,21 @@ function CaixaAberto({ sessionId, caixa }: { sessionId: string; caixa: { valor_a
           <Badge tone="green">Aberto</Badge>
         </div>
 
-        <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-3">
-          <Metric label="Abertura" value={caixa.valor_abertura} />
-          <Metric label="Vendas dinheiro" value={resumo?.vendas_dinheiro ?? 0} />
-          <Metric label="Vendas cartão/Pix" value={resumo?.vendas_outras ?? 0} />
-          <Metric label="Suprimentos" value={resumo?.suprimentos ?? 0} tone="emerald" />
-          <Metric label="Sangrias" value={resumo?.sangrias ?? 0} tone="red" />
-          <Metric label="Esperado em dinheiro" value={resumo?.esperado_dinheiro ?? 0} highlight />
-        </div>
+        {isAdmin ? (
+          <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-3">
+            <Metric label="Abertura" value={caixa.valor_abertura} />
+            <Metric label="Vendas dinheiro" value={resumo?.vendas_dinheiro ?? 0} />
+            <Metric label="Vendas cartão/Pix" value={resumo?.vendas_outras ?? 0} />
+            <Metric label="Suprimentos" value={resumo?.suprimentos ?? 0} tone="emerald" />
+            <Metric label="Sangrias" value={resumo?.sangrias ?? 0} tone="red" />
+            <Metric label="Esperado em dinheiro" value={resumo?.esperado_dinheiro ?? 0} highlight />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-5 py-4 text-sm">
+            <span className="text-slate-500">Fundo de troco (abertura)</span>
+            <span className="font-bold tabular text-slate-900">{formatBRL(caixa.valor_abertura)}</span>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 p-4">
           <Button variant="outline" onClick={() => setMovTipo('suprimento')}>
@@ -108,36 +125,41 @@ function CaixaAberto({ sessionId, caixa }: { sessionId: string; caixa: { valor_a
         </div>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader title="Movimentos do caixa" subtitle="Sangrias e suprimentos" />
-        {!movimentos || movimentos.length === 0 ? (
-          <p className="px-5 py-6 text-center text-sm text-slate-400">Nenhum movimento ainda.</p>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {movimentos.map((m) => (
-              <div key={m.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                <div className="flex items-center gap-2">
-                  {m.tipo === 'suprimento' ? (
-                    <ArrowUpRight className="h-4 w-4 text-emerald-600" />
-                  ) : (
-                    <ArrowDownLeft className="h-4 w-4 text-red-600" />
-                  )}
-                  <span className="font-medium capitalize text-slate-800">{m.tipo}</span>
-                  {m.motivo && <span className="text-slate-400">— {m.motivo}</span>}
+      {isAdmin && (
+        <Card className="overflow-hidden">
+          <CardHeader title="Movimentos do caixa" subtitle="Sangrias e suprimentos" />
+          {!movimentos || movimentos.length === 0 ? (
+            <p className="px-5 py-6 text-center text-sm text-slate-400">Nenhum movimento ainda.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {movimentos.map((m) => (
+                <div key={m.id} className="flex items-center justify-between px-5 py-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    {m.tipo === 'suprimento' ? (
+                      <ArrowUpRight className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <ArrowDownLeft className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className="font-medium capitalize text-slate-800">{m.tipo}</span>
+                    {m.motivo && <span className="text-slate-400">— {m.motivo}</span>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={cn('font-semibold tabular', m.tipo === 'suprimento' ? 'text-emerald-600' : 'text-red-600')}>
+                      {m.tipo === 'suprimento' ? '+' : '-'} {formatBRL(m.valor)}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button onClick={() => apagarMov(m.id)} className="text-slate-300 hover:text-red-500" title="Excluir">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={cn('font-semibold tabular', m.tipo === 'suprimento' ? 'text-emerald-600' : 'text-red-600')}>
-                    {m.tipo === 'suprimento' ? '+' : '-'} {formatBRL(m.valor)}
-                  </span>
-                  <span className="text-xs text-slate-400">
-                    {new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {movTipo && (
         <MovimentoCaixaModal
@@ -156,7 +178,7 @@ function CaixaAberto({ sessionId, caixa }: { sessionId: string; caixa: { valor_a
         />
       )}
 
-      {fecharOpen && <FecharCaixaModal sessionId={sessionId} onClose={() => setFecharOpen(false)} />}
+      {fecharOpen && <FecharCaixaModal sessionId={sessionId} isAdmin={isAdmin} onClose={() => setFecharOpen(false)} />}
     </div>
   )
 }
@@ -215,9 +237,9 @@ function MovimentoCaixaModal({
   )
 }
 
-function FecharCaixaModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
+function FecharCaixaModal({ sessionId, isAdmin, onClose }: { sessionId: string; isAdmin: boolean; onClose: () => void }) {
   const toast = useToast()
-  const { data: resumo } = useCaixaResumo(sessionId)
+  const { data: resumo } = useCaixaResumo(sessionId, isAdmin)
   const fechar = useFecharCaixa()
   const [contado, setContado] = useState(0)
 
@@ -248,16 +270,23 @@ function FecharCaixaModal({ sessionId, onClose }: { sessionId: string; onClose: 
       }
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
-          <span className="flex items-center gap-2 text-sm text-slate-600"><Banknote className="h-4 w-4" /> Esperado em dinheiro</span>
-          <span className="text-lg font-bold tabular text-slate-900">{formatBRL(esperado)}</span>
-        </div>
+        {isAdmin ? (
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+            <span className="flex items-center gap-2 text-sm text-slate-600"><Banknote className="h-4 w-4" /> Esperado em dinheiro</span>
+            <span className="text-lg font-bold tabular text-slate-900">{formatBRL(esperado)}</span>
+          </div>
+        ) : (
+          <p className="flex items-start gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <Banknote className="mt-0.5 h-4 w-4 shrink-0" />
+            Conte <b>todo o dinheiro da gaveta</b> e informe o valor abaixo. A conferência é feita pela administradora.
+          </p>
+        )}
 
         <Field label="Valor contado na gaveta" hint="conte o dinheiro físico">
           <MoneyInput value={contado} onChange={setContado} autoFocus />
         </Field>
 
-        {contado > 0 && (
+        {isAdmin && contado > 0 && (
           <div
             className={cn(
               'flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold',

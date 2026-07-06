@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAnchoredStyle, useDismiss } from './usePopover'
 
 export interface ComboItem {
   value: string
@@ -20,7 +22,7 @@ interface ComboboxProps {
   emptyLabel?: string
 }
 
-/** Select com busca por digitação. Ideal quando há muitos itens. */
+/** Select com busca por digitação. O menu abre num portal (não corta em modais). */
 export function Combobox({
   items,
   value,
@@ -35,7 +37,10 @@ export function Combobox({
   const [query, setQuery] = useState(selected?.label ?? '')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  const ref = useRef<HTMLDivElement>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+  useDismiss(open, () => setOpen(false), [anchorRef, popRef])
+  const popStyle = useAnchoredStyle(open, anchorRef, { height: 288, matchWidth: true })
 
   useEffect(() => {
     if (!clearOnSelect) setQuery(items.find((i) => i.value === value)?.label ?? '')
@@ -47,14 +52,6 @@ export function Combobox({
     if (!q) return items
     return items.filter((i) => i.label.toLowerCase().includes(q) || i.hint?.toLowerCase().includes(q))
   }, [items, query])
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
 
   function choose(item: ComboItem) {
     onSelect(item.value, item)
@@ -70,7 +67,7 @@ export function Combobox({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={anchorRef} className="relative">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -89,8 +86,8 @@ export function Combobox({
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
 
-      {open && (
-        <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+      {open && createPortal(
+        <div ref={popRef} style={popStyle} className="overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           {filtered.length === 0 ? (
             <p className="px-3 py-2 text-sm text-slate-400">{emptyLabel}</p>
           ) : (
@@ -113,7 +110,8 @@ export function Combobox({
               </button>
             ))
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

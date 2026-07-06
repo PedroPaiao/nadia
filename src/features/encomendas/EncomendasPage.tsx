@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import {
-  Plus, CalendarClock, CheckCircle2, DollarSign, Pencil, XCircle,
+  Plus, CalendarClock, CheckCircle2, DollarSign, Pencil, XCircle, Trash2,
   AlertTriangle, MessageCircle, Truck, Store,
 } from 'lucide-react'
 import {
-  useEncomendas, useContasReceber, useMudarStatusEncomenda, type OrderComItens,
+  useEncomendas, useContasReceber, useMudarStatusEncomenda, useExcluirEncomenda, type OrderComItens,
 } from './api'
 import { EncomendaForm } from './EncomendaForm'
 import type { OrderStatus, OrderPaymentMethod } from '@/types/db'
 import { ORDER_STATUS_LABELS, ORDER_PAYMENT_LABELS } from '@/types/db'
 import { Button, Card, CenterSpinner, EmptyState, Field, Select, Modal, Badge } from '@/components/ui'
 import { DatePicker } from '@/components/DateTimePicker'
+import { useAuth } from '@/auth/AuthProvider'
 import { useToast } from '@/components/toast'
-import { formatBRL, formatDataBR, hojeMaisDias, cn } from '@/lib/utils'
+import { formatBRL, formatDataBR, hojeData, hojeMaisDias, cn } from '@/lib/utils'
 
 type Aba = 'pendente' | 'entregue' | 'pago' | 'todas'
 const ABAS: { key: Aba; label: string }[] = [
@@ -22,12 +23,23 @@ const ABAS: { key: Aba; label: string }[] = [
   { key: 'todas', label: 'Todas' },
 ]
 
+const PAGINA = 30
+
 export function EncomendasPage() {
   const [aba, setAba] = useState<Aba>('pendente')
+  const [limite, setLimite] = useState(PAGINA)
   const [criando, setCriando] = useState(false)
   const [editando, setEditando] = useState<OrderComItens | null>(null)
-  const { data: encomendas, isLoading } = useEncomendas(aba === 'todas' ? undefined : aba)
+  const { data, isLoading } = useEncomendas(aba === 'todas' ? undefined : aba, limite)
   const { data: contas } = useContasReceber()
+
+  const encomendas = data?.rows ?? []
+  const total = data?.total ?? 0
+
+  function trocarAba(a: Aba) {
+    setAba(a)
+    setLimite(PAGINA)
+  }
 
   const totalReceber = (contas ?? []).reduce((a, c) => a + Number(c.total), 0)
   const vencidos = (contas ?? []).filter((c) => c.vencido)
@@ -64,7 +76,7 @@ export function EncomendasPage() {
         {ABAS.map((a) => (
           <button
             key={a.key}
-            onClick={() => setAba(a.key)}
+            onClick={() => trocarAba(a.key)}
             className={cn(
               'rounded-full px-4 py-1.5 text-sm font-medium transition',
               aba === a.key ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100',
@@ -77,13 +89,20 @@ export function EncomendasPage() {
 
       {isLoading ? (
         <CenterSpinner />
-      ) : !encomendas || encomendas.length === 0 ? (
+      ) : encomendas.length === 0 ? (
         <Card><EmptyState title="Nenhuma encomenda" description="Lance a primeira encomenda agendada." /></Card>
       ) : (
         <div className="space-y-3">
           {encomendas.map((e) => (
             <EncomendaCard key={e.id} encomenda={e} onEditar={() => setEditando(e)} />
           ))}
+          {encomendas.length < total && (
+            <div className="flex flex-col items-center gap-1 pt-2">
+              <Button variant="outline" onClick={() => setLimite((l) => l + PAGINA)}>
+                Carregar mais ({total - encomendas.length} restantes)
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -102,11 +121,13 @@ const statusTone: Record<OrderStatus, 'amber' | 'blue' | 'green' | 'gray'> = {
 
 function EncomendaCard({ encomenda: e, onEditar }: { encomenda: OrderComItens; onEditar: () => void }) {
   const toast = useToast()
+  const { isAdmin } = useAuth()
   const mudar = useMudarStatusEncomenda()
+  const excluir = useExcluirEncomenda()
   const [entregarOpen, setEntregarOpen] = useState(false)
   const [pagarOpen, setPagarOpen] = useState(false)
 
-  const vencido = e.status === 'entregue' && e.data_prevista_pagamento != null && e.data_prevista_pagamento < hojeMaisDias(0)
+  const vencido = e.status === 'entregue' && e.data_prevista_pagamento != null && e.data_prevista_pagamento < hojeData()
   const whatsappDigits = e.cliente_whatsapp?.replace(/\D/g, '')
 
   async function cancelar() {
@@ -114,6 +135,16 @@ function EncomendaCard({ encomenda: e, onEditar }: { encomenda: OrderComItens; o
     try {
       await mudar.mutateAsync({ id: e.id, status: 'cancelado' })
       toast.success('Encomenda cancelada.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro.')
+    }
+  }
+
+  async function apagar() {
+    if (!confirm(`Excluir a encomenda de "${e.cliente_nome}" permanentemente? Não dá para desfazer.`)) return
+    try {
+      await excluir.mutateAsync(e.id)
+      toast.success('Encomenda excluída.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro.')
     }
@@ -194,6 +225,11 @@ function EncomendaCard({ encomenda: e, onEditar }: { encomenda: OrderComItens; o
                 </button>
               </>
             )}
+            {isAdmin && (
+              <button onClick={apagar} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Excluir (apagar de vez)">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -207,30 +243,110 @@ function EncomendaCard({ encomenda: e, onEditar }: { encomenda: OrderComItens; o
 function EntregarModal({ encomenda, onClose }: { encomenda: OrderComItens; onClose: () => void }) {
   const toast = useToast()
   const mudar = useMudarStatusEncomenda()
+  const [recebido, setRecebido] = useState(false)
+  const [forma, setForma] = useState<OrderPaymentMethod>('dinheiro')
   const [previsao, setPrevisao] = useState(encomenda.data_prevista_pagamento ?? '')
 
   async function confirmar() {
     try {
-      await mudar.mutateAsync({ id: encomenda.id, status: 'entregue', data_prevista_pagamento: previsao || undefined })
-      toast.success('Encomenda marcada como entregue.')
+      if (recebido) {
+        await mudar.mutateAsync({ id: encomenda.id, status: 'pago', forma_pagamento: forma })
+        toast.success('Entregue e pago! ✅')
+      } else {
+        await mudar.mutateAsync({ id: encomenda.id, status: 'entregue', data_prevista_pagamento: previsao || undefined })
+        toast.success('Encomenda entregue.')
+      }
       onClose()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro.')
     }
   }
 
+  const atalhos = [
+    { label: 'Hoje', dias: 0 },
+    { label: '+15 dias', dias: 15 },
+    { label: '+20 dias', dias: 20 },
+    { label: '+30 dias', dias: 30 },
+  ]
+
   return (
     <Modal
-      open onClose={onClose} title="Marcar como entregue" size="sm"
-      footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={confirmar} loading={mudar.isPending}>Confirmar entrega</Button></>}
+      open onClose={onClose} onSubmit={confirmar} title="Marcar como entregue" size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={confirmar} loading={mudar.isPending}>
+            <CheckCircle2 className="h-4 w-4" /> {recebido ? 'Entregar e receber' : 'Confirmar entrega'}
+          </Button>
+        </>
+      }
     >
-      <Field label="Previsão de pagamento" hint="quando o cliente vai pagar (licitação: alguns dias depois)">
-        <div className="flex gap-2">
-          <DatePicker value={previsao} onChange={setPrevisao} className="flex-1" />
-          <Button variant="outline" size="sm" onClick={() => setPrevisao(hojeMaisDias(20))} className="whitespace-nowrap">+20 dias</Button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              {encomenda.tipo_entrega === 'entrega' ? <Truck className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+            </span>
+            <span className="truncate text-sm font-medium text-slate-700">{encomenda.cliente_nome}</span>
+          </span>
+          <span className="shrink-0 font-bold tabular text-slate-900">{formatBRL(encomenda.total)}</span>
         </div>
-      </Field>
-      <p className="mt-3 text-xs text-slate-500">Deixe em branco se o pagamento é imediato. Ficará em "A receber" até você marcar como pago.</p>
+
+        {/* Já recebeu? */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setRecebido(true)}
+            className={cn('rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+              recebido ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}
+          >
+            💰 Recebi agora
+          </button>
+          <button
+            onClick={() => setRecebido(false)}
+            className={cn('rounded-xl border px-3 py-2.5 text-sm font-semibold transition',
+              !recebido ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}
+          >
+            ⏳ Vai pagar depois
+          </button>
+        </div>
+
+        {recebido ? (
+          <Field label="Forma de pagamento">
+            <Select value={forma} onChange={(e) => setForma(e.target.value as OrderPaymentMethod)}>
+              {FORMAS_ENCOMENDA.map((f) => (
+                <option key={f} value={f}>{ORDER_PAYMENT_LABELS[f]}</option>
+              ))}
+            </Select>
+          </Field>
+        ) : (
+          <Field label="Quando o cliente vai pagar?" hint="opcional">
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {atalhos.map((a) => {
+                const val = hojeMaisDias(a.dias)
+                return (
+                  <button
+                    key={a.label}
+                    onClick={() => setPrevisao(val)}
+                    className={cn('rounded-lg px-3 py-1.5 text-sm font-medium transition',
+                      previsao === val ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')}
+                  >
+                    {a.label}
+                  </button>
+                )
+              })}
+            </div>
+            <DatePicker value={previsao} onChange={setPrevisao} />
+          </Field>
+        )}
+
+        <p className={cn('flex items-start gap-2 rounded-lg px-3 py-2 text-xs',
+          recebido ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>
+          <DollarSign className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {recebido
+            ? <>Vai direto para <b>&ldquo;Pagas&rdquo;</b> — nada fica em aberto.</>
+            : <>Fica em <b>&ldquo;A receber&rdquo;</b> até você marcar como paga (ideal para licitação).</>}
+        </p>
+      </div>
     </Modal>
   )
 }

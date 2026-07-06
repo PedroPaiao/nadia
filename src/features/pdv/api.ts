@@ -1,10 +1,28 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, mensagemErro } from '@/lib/supabase'
 import type { PaymentMethod, Sale } from '@/types/db'
 
 export interface VendaItemInput {
   product_id: string
   quantidade: number
+}
+
+export interface MaisVendidoRow {
+  product_id: string
+  quantidade: number
+}
+
+/** Campeões de venda da loja inteira (para o atalho "Mais vendidos" do PDV). */
+export function useMaisVendidos(limite = 8, dias = 90) {
+  return useQuery({
+    queryKey: ['pdv', 'mais-vendidos', limite, dias],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<MaisVendidoRow[]> => {
+      const { data, error } = await supabase.rpc('produtos_mais_vendidos', { p_limite: limite, p_dias: dias })
+      if (error) throw new Error(mensagemErro(error))
+      return (data as MaisVendidoRow[]) ?? []
+    },
+  })
 }
 
 export function useRegistrarVenda() {

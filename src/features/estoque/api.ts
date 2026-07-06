@@ -24,23 +24,28 @@ export interface EstoqueBaixoRow {
 }
 
 export const estoqueKeys = {
-  movimentos: (productId?: string) => ['estoque', 'movimentos', productId ?? 'all'] as const,
+  movimentos: (productId?: string, limite?: number) => ['estoque', 'movimentos', productId ?? 'all', limite ?? 0] as const,
   baixo: ['estoque', 'baixo'] as const,
 }
 
-export function useMovimentosEstoque(productId?: string) {
+export interface MovimentosPagina {
+  rows: StockMovementRow[]
+  total: number
+}
+
+export function useMovimentosEstoque(productId?: string, limite = 50) {
   return useQuery({
-    queryKey: estoqueKeys.movimentos(productId),
-    queryFn: async (): Promise<StockMovementRow[]> => {
+    queryKey: estoqueKeys.movimentos(productId, limite),
+    queryFn: async (): Promise<MovimentosPagina> => {
       let q = supabase
         .from('stock_movements')
-        .select('id, product_id, tipo, quantidade, estoque_apos, motivo, created_at, products(nome, unidade), profiles(nome)')
+        .select('id, product_id, tipo, quantidade, estoque_apos, motivo, created_at, products(nome, unidade), profiles(nome)', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100)
+        .limit(limite)
       if (productId) q = q.eq('product_id', productId)
-      const { data, error } = await q
+      const { data, error, count } = await q
       if (error) throw new Error(mensagemErro(error))
-      return (data as unknown as StockMovementRow[]) ?? []
+      return { rows: (data as unknown as StockMovementRow[]) ?? [], total: count ?? 0 }
     },
   })
 }
@@ -52,6 +57,20 @@ export function useEstoqueBaixo() {
       const { data, error } = await supabase.from('vw_estoque_baixo').select('*')
       if (error) throw new Error(mensagemErro(error))
       return (data as EstoqueBaixoRow[]) ?? []
+    },
+  })
+}
+
+export function useExcluirMovimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('excluir_movimento_estoque', { p_id: id })
+      if (error) throw new Error(mensagemErro(error))
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['estoque'] })
+      qc.invalidateQueries({ queryKey: ['produtos'] })
     },
   })
 }

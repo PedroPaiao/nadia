@@ -30,10 +30,10 @@ export function useCaixaAberto() {
   })
 }
 
-export function useCaixaResumo(sessionId: string | undefined) {
+export function useCaixaResumo(sessionId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: caixaKeys.resumo(sessionId ?? 'none'),
-    enabled: !!sessionId,
+    enabled: !!sessionId && enabled,
     queryFn: async (): Promise<CaixaResumo | null> => {
       const { data, error } = await supabase.rpc('caixa_resumo', { p_session_id: sessionId })
       if (error) throw new Error(mensagemErro(error))
@@ -56,6 +56,17 @@ export function useMovimentosCaixa(sessionId: string | undefined) {
       if (error) throw new Error(mensagemErro(error))
       return (data as CashMovement[]) ?? []
     },
+  })
+}
+
+export function useExcluirMovimentoCaixa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('excluir_movimento_caixa', { p_id: id })
+      if (error) throw new Error(mensagemErro(error))
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['caixa'] }),
   })
 }
 

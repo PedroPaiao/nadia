@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
   PackagePlus, AlertTriangle, ArrowDownCircle, ArrowUpCircle, SlidersHorizontal,
-  Boxes, PackageX, PackageCheck, Plus,
+  Boxes, PackageX, PackageCheck, Plus, Trash2,
 } from 'lucide-react'
-import { useMovimentosEstoque, useRegistrarMovimento } from './api'
+import { useMovimentosEstoque, useRegistrarMovimento, useExcluirMovimento } from './api'
 import { useProducts } from '@/features/produtos/api'
 import type { MovementType, Product } from '@/types/db'
 import { Button, Card, CardHeader, CenterSpinner, EmptyState, Input, Field, Badge, Modal, NumberInput } from '@/components/ui'
 import { Combobox } from '@/components/Combobox'
 import { useToast } from '@/components/toast'
+import { useAuth } from '@/auth/AuthProvider'
 import { formatQty, unidadeLabel, cn } from '@/lib/utils'
 
 const TIPO_LABEL: Record<MovementType, string> = {
@@ -28,10 +29,22 @@ function statusDe(p: Product): StatusEstoque {
 }
 
 export function EstoquePage() {
+  const { isAdmin } = useAuth()
+  const toast = useToast()
+  const excluir = useExcluirMovimento()
   const [modalOpen, setModalOpen] = useState(false)
   const [preSelecionado, setPreSelecionado] = useState<string | undefined>()
+  const [limMov, setLimMov] = useState(50)
   const { data: produtos, isLoading: loadingProd } = useProducts()
-  const { data: movimentos, isLoading } = useMovimentosEstoque()
+  const { data: movData, isLoading } = useMovimentosEstoque(undefined, limMov)
+  const movimentos = movData?.rows ?? []
+  const totalMov = movData?.total ?? 0
+
+  async function apagarMov(id: string) {
+    if (!confirm('Excluir este lançamento? O saldo do produto será recalculado. Não dá para desfazer.')) return
+    try { await excluir.mutateAsync(id); toast.success('Lançamento excluído.') }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Erro.') }
+  }
 
   const controlados = useMemo(() => (produtos ?? []).filter((p) => p.controla_estoque), [produtos])
   const ordenados = useMemo(() => {
@@ -81,10 +94,10 @@ export function EstoquePage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader title="Movimentações recentes" subtitle="Últimos 100 lançamentos" />
+        <CardHeader title="Movimentações" subtitle={totalMov > 0 ? `${movimentos.length} de ${totalMov} lançamentos` : 'Entradas, saídas e ajustes'} />
         {isLoading ? (
           <CenterSpinner />
-        ) : !movimentos || movimentos.length === 0 ? (
+        ) : movimentos.length === 0 ? (
           <EmptyState title="Sem movimentações" description="Registre entradas ou ajustes de estoque." />
         ) : (
           <div className="overflow-x-auto">
@@ -97,6 +110,7 @@ export function EstoquePage() {
                   <th className="px-4 py-3 text-right">Qtd</th>
                   <th className="px-4 py-3 text-right">Saldo</th>
                   <th className="px-4 py-3">Motivo</th>
+                  {isAdmin && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -116,10 +130,29 @@ export function EstoquePage() {
                       {m.estoque_apos != null ? formatQty(m.estoque_apos) : '—'}
                     </td>
                     <td className="px-4 py-2.5 text-slate-500">{m.motivo ?? '—'}</td>
+                    {isAdmin && (
+                      <td className="px-2 py-2.5 text-right">
+                        <button
+                          onClick={() => apagarMov(m.id)}
+                          disabled={excluir.isPending}
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          title="Excluir lançamento"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
+            {movimentos.length < totalMov && (
+              <div className="flex justify-center border-t border-slate-100 py-3">
+                <Button variant="outline" size="sm" onClick={() => setLimMov((l) => l + 50)}>
+                  Carregar mais ({totalMov - movimentos.length} restantes)
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </Card>
